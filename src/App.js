@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
-import { flatten, orderBy, filter, concat } from 'lodash';
+import { flatten, orderBy, filter, isEmpty } from 'lodash';
 import Select, { components } from 'react-select';
-import logo from './logo.svg';
+import loadingIcon from './Loading_icon.gif';
 import './App.css';
 
 const Title = styled.div`
   flex: 1;
   padding: 1em;
-  font-size: 1.3em;
+  font-size: 1.1em;
   font-weight: bold;
   text-align: center;
   a {
@@ -21,10 +21,11 @@ const Title = styled.div`
 // Create a <Wrapper> react component that renders a <section> with
 // some padding and a papayawhip background
 const Wrapper = styled.section`
-  padding: 1em;
+  padding: 1em 0;
   background: papayawhip;
   ul {
     list-style-type: none;
+    padding: 0;
     display: flex;
     flex-wrap: wrap;
     li {
@@ -41,6 +42,9 @@ const Wrapper = styled.section`
         width: 100%;
         height: 300px;
       }
+      @media only screen and (max-device-width:500px) {
+        flex: 1 1 90%;
+      }
     }
   }
 `;
@@ -55,6 +59,10 @@ display: inline-flex;
 flex-direction: row;
 text-align: center;
 min-width: 70%;
+@media only screen and (max-device-width:500px) {
+  width: 100%;
+  flex-direction: column;
+}
 .select {
   margin: 0 20px;
   flex: 1;
@@ -62,16 +70,21 @@ min-width: 70%;
 `;
 
 const Note = styled.div``;
+const ReleaseDate = styled.div`
+font-weight: normal;
+font-size: 0.6em;
+`;
 
 const OrderByOptions = [
   { value: 'desc', label: 'Note : par ordre croissant' },
   { value: 'asc', label: 'Note : par ordre décroissant' },
 ];
 
-function App() {
+function App(props) {
+  console.log(props);
   const [movies, setMovies] = useState([]);
+  const [initMovies, setInitMovies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [OrderByOption, setOrderByOption] = useState('desc');
   const [actors, setActors] = useState([]);
   useEffect(async () => {
     try {
@@ -91,6 +104,7 @@ function App() {
       moviesData = flatten(moviesData);
       moviesData = orderBy(moviesData, ['vote_average'], ['desc']);
       setMovies(moviesData);
+      setInitMovies(moviesData);
   } catch (error) {
       throw error;
   } finally {
@@ -113,38 +127,54 @@ function App() {
 }
 
   }, []);
+
   const handleChange = (event) => {
     const order = event.value === 'desc' ? 'asc' : 'desc';
     setMovies(orderBy(movies, ['vote_average'], [order]));
   }
 
   const handleChangeActor = (event) => {
-    console.log(event);
-    const actorIds = event.map(ev => ev.value);
-    console.log(actorIds);
-    setMovies(filter(movies, (movie) => { return flatten(actorIds).includes(movie.actorId)}));
+    if (isEmpty(event)) {
+      setMovies(initMovies);
+    } else {
+      const actorIds = event.map(ev => ev.value);
+      const isIncludedMovie = (id) => actorIds.includes(id);
+      const moviesFiltered = filter(initMovies, (movie) => {return isIncludedMovie(movie.actorId) });
+      setMovies(moviesFiltered);
+    }
   }
   return (
     <div className="App">
       {
-          !loading &&
+          loading ? <img src={loadingIcon} /> :
           <Wrapper>
             <Filter>
               <Select
                 options = {OrderByOptions} onChange={(event) => handleChange(event)}
+                defaultValue={OrderByOptions[1]}
                 className="select"
               />
               <Select
-                options = {actors} onChange={(event) => handleChangeActor(event)}
+                options = {actors}
+                onChange={(event) => handleChangeActor(event)}
                 isMulti
                 className="select"
+                closeMenuOnSelect={false}
               />
             </Filter>
             <ul>
             {movies && movies.map((item, index) => (
               <li key={index}>
                 <Poster><img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} /></Poster>
-                <Title><a href={item.title}>{item.title}</a><Note>{item.vote_average} / 10</Note></Title>
+                <Title>
+                  <a
+                    href={`/movies/${item.id}`}
+                  >
+                    {item.title}
+                  </a>
+                  <Note>{item.vote_average} / 10</Note>
+                  {item.release_date && <ReleaseDate>année de sortie: {item.release_date}</ReleaseDate>}
+                </Title>
               </li>
               ))}
             </ul>
